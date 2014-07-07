@@ -1,0 +1,366 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+<title>Infographics Generator</title>
+<link href='http://fonts.googleapis.com/css?family=Alegreya' rel='stylesheet' type='text/css'>
+<link href='http://fonts.googleapis.com/css?family=Roboto+Condensed' rel='stylesheet' type='text/css'>
+<link rel="stylesheet" type="text/css" href="./stylesheets/style.css">  
+<link rel="stylesheet" type="text/css" href="./stylesheets/chart.css">  
+<script src="./javascripts/bar-chart.js"></script>
+<script src="./javascripts/stack-chart.js"></script>
+<script src="http://code.jquery.com/jquery-2.1.1.js"></script>
+<script src="http://d3js.org/d3.v3.js" charset="utf-8"></script>
+<script type="text/javascript">
+var analystEst;
+var keyStats;
+var histData;
+var incomeStat;
+var symbol;
+var cname;
+var symMap;
+$(document).ready(function(){
+	symbol 	= 'GOOGL';
+	cname 	= "Google";
+
+	var curMonth= (new Date()).getMonth();
+	var curDate = (new Date()).getDate();
+	var curYear = (new Date()).getFullYear();
+
+	// ANALYSIS ESTIMATES
+
+	var yql_base_uri = "http://query.yahooapis.com/v1/public/yql?";
+	var yql_query = "SELECT * FROM yahoo.finance.analystestimate WHERE symbol='"+symbol+"'";
+	var startDate 	= constructQueryDate(curYear-1, curMonth, curDate);
+	var endDate		= constructQueryDate(curYear, curMonth, curDate);
+
+	$.when(
+		$.get("./files/secwiki_tickers.csv"), 
+		runQuery(yql_base_uri,
+			"SELECT * FROM yahoo.finance.analystestimate WHERE symbol='"+symbol+"'"),
+		runQuery(yql_base_uri,
+			"SELECT * FROM yahoo.finance.keystats WHERE symbol='"+symbol+"'"),
+		runQuery(yql_base_uri,
+			"SELECT * FROM yahoo.finance.incomestatement WHERE symbol='"+symbol+"'"),
+		runQuery(yql_base_uri,
+			"select * from yahoo.finance.historicaldata(0) where symbol = '"+symbol+"' and startDate = '"+startDate+"' and endDate = '"+endDate+"'")
+
+		).done(function(tickerData, resAnalystEst, resKeyStats, resIncomeStat, resHistPrice){
+			// Symbol -> Name, Sector, Industry Mapping
+			symMap = {};
+			var lines = tickerData[0].split('\n');
+			var header = lines[0];
+			for (var i=1; i<lines.length; i++){
+				var cols = lines[i].split(',');
+				symMap[cols[0]] = {
+					symbol		: cols[0],
+					name		: cols[1],
+					sector 		: cols[2],
+					industry	: cols[3],
+					price 		: cols[4],
+					collection	: cols[5]
+				};
+			}
+			console.log(symMap);	
+
+			cname = symMap[symbol].name;
+			
+			// Finance Data		
+			analystEst = resAnalystEst[0].query.results.results;
+			console.log('ANALYSIS ESTIMATES')
+			console.log(analystEst);
+
+			keyStats = resKeyStats[0].query.results.stats;
+			console.log('KEY STATISTICS')
+			console.log(keyStats);	
+
+			incomeStat = resIncomeStat[0].query.results.incomestatement.statement;
+			console.log('INCOME STATEMENT')
+			console.log(incomeStat);	
+
+
+			histData = resHistPrice[0].query.results.quote;
+			for (var i in histData){
+				histData[i].Adj_Close 	= parseFloat(histData[i].Adj_Close);
+				histData[i].Close 		= parseFloat(histData[i].Close);
+				histData[i].High 		= parseFloat(histData[i].High);
+				histData[i].Open 		= parseFloat(histData[i].Open);
+				histData[i].Low 		= parseFloat(histData[i].Low);
+				histData[i].Volume 		= parseFloat(histData[i].Volume); 
+			}
+			console.log('HISTORICAL DATA')
+			console.log(histData);
+
+			console.log('GENERATE GRAPHICS')
+			generateGraphics();
+
+		});
+
+
+});
+
+function generateGraphics(){
+	// GENERATE GRAPHICS
+	var w = 800;
+	var h = 1200;
+	var x = 10;
+	var y = 60;
+	var report = d3.select(".report").style("background-color", "#ffffff");
+
+	var svg = report.append("svg")
+		.attr("width", w)
+		.attr("height", h);
+	var curEpsQtrGrowth = parsePercent(analystEst.GrowthEst.CurrentQtr[symbol])
+	if (curEpsQtrGrowth>0){
+		titleText = cname + " Earnings Expected to Rise"
+	}else{
+		titleText = cname + " Profit Expected to Fall";		
+	}
+	var title = svg.append("text")
+		.attr("x", x)
+		.attr("y", y)
+		.text(titleText)
+		.attr("font-family", "'Alegreya', serif")
+		.attr("font-size", "48px")
+		.attr("fill", "#2e3436");
+
+	var epsQtrEst = parseFloat(analystEst.EarningsEst.AvgEstimate.CurrentQtr);
+	var epsYrEst = parseFloat(analystEst.EarningsEst.AvgEstimate.CurrentYear)
+	var epsQtrYrAgo = parseFloat(analystEst.EarningsEst.YearAgoEPS.CurrentQtr);
+	var epsYrYrAgo = parseFloat(analystEst.EarningsEst.YearAgoEPS.CurrentYear);
+
+	var curRevQtrGrowth = parsePercent(analystEst.RevenueEst.SalesGrowth.CurrentQtr);
+	var revQtrEst = parsePercent(analystEst.RevenueEst.AvgEstimate.CurrentQtr);
+	var revYrEst  = parsePercent(analystEst.RevenueEst.AvgEstimate.CurrentYear);
+	var revQtrYrAgo = parsePercent(analystEst.RevenueEst.YearAgoSales.CurrentQtr);
+	var revYrYrAgo = parsePercent(analystEst.RevenueEst.YearAgoSales.CurrentYear);
+
+	// Revenue decrease or increase?
+	y += 50;
+
+	var highlightText;
+	if (curEpsQtrGrowth){
+		highlightText = "Analysts project a profit of $" + epsQtrEst + " a share, a rise from $" + epsQtrYrAgo + " per share a year ago";
+	}else{
+		highlightText = "Analysts project profit to drop from $"+epsYrYrAgo+" year-over-year to $"+ epsQtrEst+" per share.";
+	}
+	var highlight = svg.append("text")
+		.attr("x", x)
+		.attr("y", y)
+		.text(highlightText)
+		.attr("font-size", "18px")
+		.attr("fill", "DarkSlateGray");
+
+	// FIRST LAYER
+	y += 50;
+
+	var firstLayer = svg.append("g");
+
+	var firstCol 	= firstLayer.append("svg")
+		.attr("x", x)
+		.attr("y", y)
+		.attr("width", 250)
+		.attr("height", 250);
+
+	var iconlink = "./icons/increase.svg";
+	if (epsQtrEst<epsQtrYrAgo){
+		iconlink = "./icons/decrease.svg";
+	}
+	firstCol.append("text")
+		.attr("x", 0)
+		.attr("y", 20)
+		.text("EPS Estimate")
+		.attr("font-family", "'Roboto Condensed', sans-serif")
+		.attr("font-size", "24px")
+		.attr("fill", "#2e3436");	
+
+	firstCol.append("image")
+		.attr("x", 20)
+		.attr("y", 30)
+		.attr("width", 100)
+		.attr("height", 100)
+		.attr("xlink:href", iconlink);
+	firstCol.append("text")
+		.attr("x", 0)
+		.attr("y", 150)
+		.text("$" + epsQtrYrAgo+" \u2192 "+"$"+ epsQtrEst + "("+curEpsQtrGrowth+"%)")
+		.attr("font-family", "'Roboto Condensed', sans-serif")
+		.attr("font-size", "20px")
+		.attr("fill", "#2e3436");
+
+	var secondCol 	= firstLayer.append("svg")
+		.attr("x", x+250)
+		.attr("y", y)
+		.attr("width", 250)
+		.attr("height", 250);
+
+
+	var iconlink = "./icons/increase.svg";
+	if (revQtrEst<revQtrYrAgo){
+		iconlink = "./icons/decrease.svg";
+	}
+	secondCol.append("text")
+		.attr("x", 0)
+		.attr("y", 20)
+		.text("Revenue Estimate")
+		.attr("font-family", "'Roboto Condensed', sans-serif")
+		.attr("font-size", "24px")
+		.attr("fill", "#2e3436");	
+
+	secondCol.append("image")
+		.attr("x", 20)
+		.attr("y", 30)
+		.attr("width", 100)
+		.attr("height", 100)
+		.attr("xlink:href", iconlink);
+	secondCol.append("text")
+		.attr("x", 0)
+		.attr("y", 150)
+		.text("$" + revQtrYrAgo+"B \u2192 "+"$"+ revQtrEst + "B ("+curRevQtrGrowth+"%)")
+		.attr("font-family", "'Roboto Condensed', sans-serif")
+		.attr("font-size", "20px")
+		.attr("fill", "#2e3436");		
+
+	var thirdCol 	= firstLayer.append("svg")
+		.attr("x", x+500)
+		.attr("y", y)
+		.attr("width", 250)
+		.attr("height", 250);
+
+	thirdCol.append("text")
+		.attr("x", 0)
+		.attr("y", 20)
+		.text("Fiscal-Year Estimate")
+		.attr("font-family", "'Roboto Condensed', sans-serif")
+		.attr("font-size", "24px")
+		.attr("fill", "#2e3436");	
+
+	thirdCol.append("image")
+		.attr("x", 20)
+		.attr("y", 30)
+		.attr("width", 40)
+		.attr("height", 40)
+		.attr("xlink:href", "./icons/money1.svg");
+
+	thirdCol.append("text")
+		.attr("x", 70)
+		.attr("y", 50)
+		.text("$" + epsYrEst+" Per Share")
+		.attr("font-family", "'Roboto Condensed', sans-serif")
+		.attr("font-size", "20px")
+		.attr("fill", "#2e3436");	
+
+	thirdCol.append("image")
+		.attr("x", 20)
+		.attr("y", 80)
+		.attr("width", 40)
+		.attr("height", 40)
+		.attr("xlink:href", "./icons/money2.svg");
+
+	thirdCol.append("text")
+		.attr("x", 70)
+		.attr("y", 110)
+		.text("$" + revYrEst+" Billion")
+		.attr("font-family", "'Roboto Condensed', sans-serif")
+		.attr("font-size", "20px")
+		.attr("fill", "#2e3436");	
+
+	y+=200;
+	var secondLayer = svg.append("g");
+	var firstCol 	= secondLayer.append("svg")
+		.attr("x", x)
+		.attr("y", y)
+		.attr("width", 350)
+		.attr("height", 250);
+	var data = [];
+	for (var i in incomeStat){
+		data.push({
+			label: incomeStat[i].period,
+			value: parseInt(incomeStat[i].TotalRevenue.content)
+		});
+	}		
+	barchart.generate({
+		container	: firstCol,
+		position	: {x:0, y:0},
+		size 		: {width : 300, height: 200},
+		margin 		: {top: 40, right: 40, bottom: 40, left: 40},
+		data 		: data
+	})
+
+	var secondCol = secondLayer.append("svg")
+		.attr("x", x + 400)
+		.attr("y", y)
+		.attr("width", 350)
+		.attr("height", 250);
+	var data = [];
+	for (var i in histData){
+		data.push({
+			date: d3.time.format("%Y-%m-%d").parse(histData[i].Date),
+			value: histData[i].Close
+		})
+	}
+	stackchart.generate({
+		container 	: secondCol,
+		position 	: {x:0, y:0},
+		size 		: {width:300, height:200},
+		margin 		: {top: 40, right: 40, bottom: 40, left: 40},
+		data  		: data
+	})
+
+	var thridLayer = svg.append("g");
+
+}
+function constructQueryDate(year, month, date){
+	return year + "-"+(month>=10? month:("0"+month)) + "-"+ (date>=10? date:("0"+date));p
+}
+function parsePercent(str){
+	return parseFloat(str.slice(0, -1));
+}
+function parseDate(str){
+	var month = -1;
+	switch (str.slice(0, 2)){
+		case "Jan": 	month = 0;	break;
+		case "Feb": 	month = 1;	break;
+		case "Mar": 	month = 2;	break;
+		case "Apr": 	month = 3;	break;
+		case "May": 	month = 4;	break;
+		case "Jun": 	month = 5;	break;
+		case "Jul": 	month = 6;	break;
+		case "Aug": 	month = 7;	break;
+		case "Sep": 	month = 8;	break;
+		case "Oct": 	month = 9;	break;
+		case "Nov": 	month = 10;	break;
+		case "Dec": 	month = 11;	break;
+
+	} 
+	var date = parseInt(str.slice(3));
+	return {month: month, date: day};
+}
+function toQueryString(obj) {      
+  var parts = [];      
+  for(var each in obj) if (obj.hasOwnProperty(each)) {  
+    parts.push(encodeURIComponent(each) + '=' + encodeURIComponent(obj[each]));      
+  }      
+  return parts.join('&');    
+}; 	
+var runQuery = function(ws_base_uri,query) {  
+	var url = ws_base_uri + toQueryString({q: query, format: 'json', env: 'store://datatables.org/alltableswithkeys'});
+	console.log(url)
+	return $.ajax({
+		type: "GET",
+		url:url,
+		dataType: "json"
+	});
+}; 
+</script>
+</head>
+<body>
+	<div id="chart">
+  <svg></svg>
+</div>
+
+	<div class="container">
+		<div class="report"></report>
+	</div>
+</body>
+</html>

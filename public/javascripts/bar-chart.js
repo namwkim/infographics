@@ -14,13 +14,17 @@ var barchart = {
 
     var xAxis = d3.svg.axis()
     .scale(x)
-    .orient("bottom");
-
+    .orient("bottom")
+    .tickFormat(function(d){
+        var splited = d.split(",");
+        return splited[0] + " '"+splited[1].slice(-2);
+    });
+/*
     var yAxis = d3.svg.axis()
     .scale(y)
     .orient("left")
     .ticks(10, "%");
-
+*/
     var svg = settings.container.append("svg")
     .attr("x", settings.position.x)
     .attr("y", settings.position.y)
@@ -49,6 +53,8 @@ var barchart = {
     .style("text-anchor", "end")
     .text("Frequency");
 */
+
+
     svg.selectAll(".bar")
     .data(data)
     .enter().append("rect")
@@ -58,6 +64,32 @@ var barchart = {
     .attr("y", function(d) { return y(d.value); })
     .attr("height", function(d) { return height - y(d.value); });
 
+    var fmt = this.toCurrency;
+
+    svg.selectAll(".bar-label")
+    .data(data)
+    .enter().append("text")
+    .attr("class", "bar-label")
+    .attr("x", function(d) { return x(d.label)+5;})
+    .attr("y", function(d) { return y(d.value)+15; })
+    .text(function(d){ return fmt(d.value); })
+    .attr("font-family", "Verdana")
+    .attr("font-size", "12px")
+    .attr("font-weight", "bold")
+    .attr("fill", "white");
     //});
+  },
+  toCurrency : function(number){
+    if (number>Math.pow(10,12)){
+        return "$"+Math.round(number/Math.pow(10,12))+"T";
+    }else if (number>Math.pow(10,9)){
+        return "$"+Math.round(number/Math.pow(10,9))+"B";
+    }else if (number>Math.pow(10,6)){
+        return "$"+Math.round(number/Math.pow(10,6))+"M";
+    }else if (number>Math.pow(10,3)){
+        return "$"+Math.round(number/Math.pow(10,3))+"K";
+    }else{ 
+        return "$"+Math.round(number);
+    }
   }
 }

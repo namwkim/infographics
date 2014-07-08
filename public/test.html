@@ -21,7 +21,6 @@ var cname;
 var symMap;
 $(document).ready(function(){
 	symbol 	= 'GOOGL';
-	cname 	= "Google";
 
 	var curMonth= (new Date()).getMonth();
 	var curDate = (new Date()).getDate();
@@ -31,8 +30,8 @@ $(document).ready(function(){
 
 	var yql_base_uri = "http://query.yahooapis.com/v1/public/yql?";
 	var yql_query = "SELECT * FROM yahoo.finance.analystestimate WHERE symbol='"+symbol+"'";
-	var startDate 	= constructQueryDate(curYear-1, curMonth, curDate);
-	var endDate		= constructQueryDate(curYear, curMonth, curDate);
+	var startDate 	= constructQueryDate(curYear-1, curMonth+1, curDate);
+	var endDate		= constructQueryDate(curYear, curMonth+1, curDate);
 
 	$.when(
 		$.get("./files/secwiki_tickers.csv"), 
@@ -151,7 +150,7 @@ function generateGraphics(){
 		.attr("font-size", "18px")
 		.attr("fill", "DarkSlateGray");
 
-	// FIRST LAYER
+	/////////////////////////////////////////////////////////// First Layer //////////////////////////////
 	y += 50;
 
 	var firstLayer = svg.append("g");
@@ -170,7 +169,8 @@ function generateGraphics(){
 		.attr("x", 0)
 		.attr("y", 20)
 		.text("EPS Estimate")
-		.attr("font-family", "'Roboto Condensed', sans-serif")
+		.attr("font-weight", "bold")
+		//.attr("font-family", "'Roboto Condensed', sans-serif")
 		.attr("font-size", "24px")
 		.attr("fill", "#2e3436");	
 
@@ -184,12 +184,12 @@ function generateGraphics(){
 		.attr("x", 0)
 		.attr("y", 150)
 		.text("$" + epsQtrYrAgo+" \u2192 "+"$"+ epsQtrEst + "("+curEpsQtrGrowth+"%)")
-		.attr("font-family", "'Roboto Condensed', sans-serif")
+		//.attr("font-family", "'Roboto Condensed', sans-serif")
 		.attr("font-size", "20px")
 		.attr("fill", "#2e3436");
 
 	var secondCol 	= firstLayer.append("svg")
-		.attr("x", x+250)
+		.attr("x", x+225)
 		.attr("y", y)
 		.attr("width", 250)
 		.attr("height", 250);
@@ -203,7 +203,8 @@ function generateGraphics(){
 		.attr("x", 0)
 		.attr("y", 20)
 		.text("Revenue Estimate")
-		.attr("font-family", "'Roboto Condensed', sans-serif")
+		.attr("font-weight", "bold")
+		//.attr("font-family", "'Roboto Condensed', sans-serif")
 		.attr("font-size", "24px")
 		.attr("fill", "#2e3436");	
 
@@ -217,7 +218,7 @@ function generateGraphics(){
 		.attr("x", 0)
 		.attr("y", 150)
 		.text("$" + revQtrYrAgo+"B \u2192 "+"$"+ revQtrEst + "B ("+curRevQtrGrowth+"%)")
-		.attr("font-family", "'Roboto Condensed', sans-serif")
+		//.attr("font-family", "'Roboto Condensed', sans-serif")
 		.attr("font-size", "20px")
 		.attr("fill", "#2e3436");		
 
@@ -231,7 +232,8 @@ function generateGraphics(){
 		.attr("x", 0)
 		.attr("y", 20)
 		.text("Fiscal-Year Estimate")
-		.attr("font-family", "'Roboto Condensed', sans-serif")
+		//.attr("font-family", "'Roboto Condensed', sans-serif")
+		.attr("font-weight", "bold")
 		.attr("font-size", "24px")
 		.attr("fill", "#2e3436");	
 
@@ -246,7 +248,7 @@ function generateGraphics(){
 		.attr("x", 70)
 		.attr("y", 50)
 		.text("$" + epsYrEst+" Per Share")
-		.attr("font-family", "'Roboto Condensed', sans-serif")
+		//.attr("font-family", "'Roboto Condensed', sans-serif")
 		.attr("font-size", "20px")
 		.attr("fill", "#2e3436");	
 
@@ -261,10 +263,10 @@ function generateGraphics(){
 		.attr("x", 70)
 		.attr("y", 110)
 		.text("$" + revYrEst+" Billion")
-		.attr("font-family", "'Roboto Condensed', sans-serif")
+		//.attr("font-family", "'Roboto Condensed', sans-serif")
 		.attr("font-size", "20px")
 		.attr("fill", "#2e3436");	
-
+	/////////////////////////////////////////////////////////// Second Layer //////////////////////////////
 	y+=200;
 	var secondLayer = svg.append("g");
 	var firstCol 	= secondLayer.append("svg")
@@ -282,8 +284,8 @@ function generateGraphics(){
 	barchart.generate({
 		container	: firstCol,
 		position	: {x:0, y:0},
-		size 		: {width : 300, height: 200},
-		margin 		: {top: 40, right: 40, bottom: 40, left: 40},
+		size 		: {width : 350, height: 200},
+		margin 		: {top: 40, right: 10, bottom: 40, left: 10},
 		data 		: data
 	})
 
@@ -292,6 +294,32 @@ function generateGraphics(){
 		.attr("y", y)
 		.attr("width", 350)
 		.attr("height", 250);
+
+	secondCol.append("foreignObject")
+		.attr("x", 0)
+		.attr("y", 10)
+		.attr("width", 350)
+		.attr("height", 250)
+		.append("xhtml:p")
+		.html(analyzeRevenueHistory(data));
+	/////////////////////////////////////////////////////////// Third Layer //////////////////////////////
+	y+= 250;
+
+	var thridLayer = svg.append("g");
+	var firstCol 	= thridLayer.append("svg")
+		.attr("x", x)
+		.attr("y", y)
+		.attr("width", 350)
+		.attr("height", 250);
+
+	firstCol.append("foreignObject")
+		.attr("x", 0)
+		.attr("y", 10)
+		.attr("width", 350)
+		.attr("height", 250)
+		.append("xhtml:p")
+		.html(analyzePriceHistory(histData));
+
 	var data = [];
 	for (var i in histData){
 		data.push({
@@ -299,16 +327,138 @@ function generateGraphics(){
 			value: histData[i].Close
 		})
 	}
+	var secondCol = thridLayer.append("svg")
+		.attr("x", x + 400)
+		.attr("y", y)
+		.attr("width", 350)
+		.attr("height", 250);
+
 	stackchart.generate({
 		container 	: secondCol,
 		position 	: {x:0, y:0},
-		size 		: {width:300, height:200},
-		margin 		: {top: 40, right: 40, bottom: 40, left: 40},
+		size 		: {width:350, height:200},
+		margin 		: {top: 40, right: 10, bottom: 40, left: 60},
 		data  		: data
 	})
+	/////////////////////////////////////////////////////////// Fourth Layer //////////////////////////////
+	y += 250;
+	var fourthLayer = svg.append("g");
+	
+}
+function analyzeRevenueHistory(data){
+	var result = "";
+	//1. Find Increasing or Decreasing Trend
+	var pairs = d3.pairs(data);
+	var inc = 0, dec = 0;
+	for (var i in pairs){
+		console.log(pairs[i][0].value +", " +pairs[i][1].value);
+		if (inc == i && pairs[i][0].value > pairs[i][1].value){
+			inc+=1;
+		}
+		if (dec == i && pairs[i][0].value < pairs[i][1].value){
+			dec+=1
+		}
+	}
+	if (inc>0){
+		result+="Revenue rose in the last " + (inc+1) +" quarters. " 
+		result+="In the last quarter, revenue increased " + 
+			calcPercentChange(data[0].value, data[inc].value) + "% to " +
+			toCurrency(data[0].value) + " from the " + toQuarter(data[inc].label) + " quarter("
+			+ data[inc].label.slice(-4) +").";
 
-	var thridLayer = svg.append("g");
+	}
+	if (dec>0){
+		result+="Revenue dropped in the last " + (dec+1) + " quarters. "
+		result+="In the last quarter, revenue decreased " + 
+			calcPercentChange(data[0].value, data[dec].value) + "% to " +
+			toCurrency(data[0].value) + " from the " + toQuarter(data[dec].label) + " quarter("
+			+ data[dec].label.slice(-4) +").";
 
+	}
+
+	//2. % Increase or Decrease from Min or Max.
+	var cloned = data.slice(0);
+	cloned.sort(function(a, b) { return d3.descending(a.value, b.value); })
+	var max = cloned[0];//d3.max(data, function(d){ return d.value});
+	var min = cloned[cloned.length-1]; //d3.min(data, function(d){ return d.value});
+	//console.log(max)
+	result += "Over the year, maximum revenue occured in " + toQuarter(max.label) + " quarter("
+			+ max.label.slice(-4) +") and minimum revenue was in "+ toQuarter(min.label) + " quarter("
+			+ min.label.slice(-4) +").";
+	result += "The difference between the two extremes is " + toCurrency(max.value - min.value) 
+			+ " (" + calcPercentChange(max.value, min.value)+  "%)";
+	return result;
+
+}
+function analyzePriceHistory(data){
+	//1. current price
+	//2. max price over the past year
+	//3. min price over the past year
+	var curPrice = data[0].Close;
+	var cloned = data.slice(0);
+	cloned.sort(function (a, b) { return d3.descending(a.Close, b.Close); })
+	var max = cloned[0];
+	var min = cloned[cloned.length-1];
+
+	var maxDate = d3.time.format("%Y-%m-%d").parse(max.Date);
+	var minDate = d3.time.format("%Y-%m-%d").parse(max.Date);
+	var result = cname + "'s current stock price is " + toCurrency(curPrice) + ".";
+
+	if (max.Date>min.Date){
+
+		result += "For the past year, the highest price was " + toCurrency(max.Close) + " which occured in " + maxDate.toDateString() 
+			+ ". It is " + calcPercentChange(max.Close, min.Close) + "% increase from the lowest price, " + toCurrency(min.Close)  + " (" + minDate.toDateString()+")."
+	}else{
+		result += "For the past year, the lowest price was " + toCurrency(min.Close) + " which occured on " + minDate.toDateString() 
+			+ ". It is " + calcPercentChange(max.Close, min.Close) + "% decrease from the highest price, " + toCurrency(max.Close)  + " on " + maxDate.toDateString()+""
+	}
+	//4. Moving Average
+	var mv50 = 0;
+	for (var i=0; i<50; i++){
+		mv50 += data[i].Close;
+	}
+	mv50/=50;
+	var mv200 = 0;
+	for (var i=0; i<200; i++){
+		mv200 += data[i].Close;
+	}
+	mv200/=200;
+
+	if (mv50>curPrice && mv200>curPrice){
+		result += "50Day-, 200Day-MA prices are " + mv50 + ", "+mv200 +" respectively, higher than the current price and possibly indicating the increasing direction of future price.";
+	}else if (mv50<curPrice && mv200<curPrice){
+		result += "50Day-, 200Day-MA prices are " + mv50 + ", "+mv200 +" respectively, lower than the current price and possibly indicating the decreasing direction of future price.";
+
+	}
+
+		
+	return result;
+}
+function toCurrency(number){
+	if (number>Math.pow(10,12)){
+		return "$"+Math.round(number/Math.pow(10,12))+" trillion";
+	}else if (number>Math.pow(10,9)){
+		return "$"+Math.round(number/Math.pow(10,9))+" billion";
+	}else if (number>Math.pow(10,6)){
+		return "$"+Math.round(number/Math.pow(10,6))+" million";
+	}else{ 
+		return "$"+Math.round(number);
+	}
+}
+function calcPercentChange(curr, prev){
+	return Math.round((curr-prev)/prev*10000)/100;
+}
+function toQuarter(date){
+	var m = toMonth(date.slice(0, 3));
+	if (m>=0 && m<=2){
+		return "first";
+	}else if (m>=3 && m<=5){
+		return "second";
+	}else if (m>=6 && m<=8){
+		return "third";
+	}else if (m>=9 && m<=11){
+		return "fourth";
+	}
 }
 function constructQueryDate(year, month, date){
 	return year + "-"+(month>=10? month:("0"+month)) + "-"+ (date>=10? date:("0"+date));p
@@ -317,8 +467,13 @@ function parsePercent(str){
 	return parseFloat(str.slice(0, -1));
 }
 function parseDate(str){
+	var month = toMonth(str.slice(0, 2))
+	var date = parseInt(str.slice(3));
+	return {month: month, date: day};
+}
+function toMonth(monAbbr){
 	var month = -1;
-	switch (str.slice(0, 2)){
+	switch (monAbbr){
 		case "Jan": 	month = 0;	break;
 		case "Feb": 	month = 1;	break;
 		case "Mar": 	month = 2;	break;
@@ -331,10 +486,8 @@ function parseDate(str){
 		case "Oct": 	month = 9;	break;
 		case "Nov": 	month = 10;	break;
 		case "Dec": 	month = 11;	break;
-
 	} 
-	var date = parseInt(str.slice(3));
-	return {month: month, date: day};
+	return month;
 }
 function toQueryString(obj) {      
   var parts = [];      

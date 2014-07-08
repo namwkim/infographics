@@ -15,7 +15,12 @@
   stroke: #000;
   shape-rendering: crispEdges;
 }
-
+.axis text{
+    font-family: Verdana;
+    font-size: 12px;	
+    font-weight: bold;
+    fill:DimGray;
+}
 .x.axis path {
   display: none;
 }

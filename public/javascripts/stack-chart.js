@@ -15,11 +15,14 @@ var stackchart = {
 
     var xAxis = d3.svg.axis()
         .scale(x)
-        .orient("bottom");
+        .orient("bottom")
+        .ticks(4);
 
     var yAxis = d3.svg.axis()
         .scale(y)
-        .orient("left");
+        .orient("left")
+        .ticks(4)
+        .tickFormat(d3.format("$,"));
 
     var area = d3.svg.area()
         .x(function(d) { return x(d.date); })
@@ -56,11 +59,6 @@ var stackchart = {
     svg.append("g")
         .attr("class", "y axis")
         .call(yAxis)
-      .append("text")
-        .attr("transform", "rotate(-90)")
-        .attr("y", 6)
-        .attr("dy", ".71em")
-        .style("text-anchor", "end")
-        .text("Price ($)");
+      
   }
 }

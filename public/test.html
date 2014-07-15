@@ -23,30 +23,10 @@ var profileMap;
 $(document).ready(function(){
 	symbol 	= 'AAPL';
 
-	var curMonth= (new Date()).getMonth();
-	var curDate = (new Date()).getDate();
-	var curYear = (new Date()).getFullYear();
-
-	// ANALYSIS ESTIMATES
-
-	var yql_base_uri = "http://query.yahooapis.com/v1/public/yql?";
-	var yql_query = "SELECT * FROM yahoo.finance.analystestimate WHERE symbol='"+symbol+"'";
-	var startDate 	= constructQueryDate(curYear-1, curMonth+1, curDate);
-	var endDate		= constructQueryDate(curYear, curMonth+1, curDate);
-
 	$.when(
 		$.get("./files/company_profile.csv"),
-		$.get("./files/secwiki_tickers.csv"), 
-		runQuery(yql_base_uri,
-			"SELECT * FROM yahoo.finance.analystestimate WHERE symbol='"+symbol+"'"),
-		runQuery(yql_base_uri,
-			"SELECT * FROM yahoo.finance.keystats WHERE symbol='"+symbol+"'"),
-		runQuery(yql_base_uri,
-			"SELECT * FROM yahoo.finance.incomestatement WHERE symbol='"+symbol+"'"),
-		runQuery(yql_base_uri,
-			"select * from yahoo.finance.historicaldata(0) where symbol = '"+symbol+"' and startDate = '"+startDate+"' and endDate = '"+endDate+"'")
-
-		).done(function(profileData, tickerData, resAnalystEst, resKeyStats, resIncomeStat, resHistPrice){
+		$.get("./files/secwiki_tickers.csv")
+		).done(function(profileData, tickerData){
 			//console.log(profileData[0])
 			var lines = profileData[0].split('\n');
 			profileMap = {};
@@ -72,44 +52,82 @@ $(document).ready(function(){
 					price 		: cols[4],
 					collection	: cols[5]
 				};
+				// Populate Select Box
+				$('#cp_list').append($('<option>', {
+					value : cols[0],
+					text : cols[1]
+				}))
+
 			}
+			// Symbol Map
 			console.log(symMap);	
-			cname = symMap["AAPL"].name;
-			
-			// Finance Data		
-			analystEst = resAnalystEst[0].query.results.results;
-			console.log('ANALYSIS ESTIMATES')
-			console.log(analystEst);
-
-			keyStats = resKeyStats[0].query.results.stats;
-			console.log('KEY STATISTICS')
-			console.log(keyStats);	
-
-			incomeStat = resIncomeStat[0].query.results.incomestatement.statement;
-			console.log('INCOME STATEMENT')
-			console.log(incomeStat);	
-
-
-			histData = resHistPrice[0].query.results.quote;
-			for (var i in histData){
-				histData[i].Adj_Close 	= parseFloat(histData[i].Adj_Close);
-				histData[i].Close 		= parseFloat(histData[i].Close);
-				histData[i].High 		= parseFloat(histData[i].High);
-				histData[i].Open 		= parseFloat(histData[i].Open);
-				histData[i].Low 		= parseFloat(histData[i].Low);
-				histData[i].Volume 		= parseFloat(histData[i].Volume); 
-			}
-			console.log('HISTORICAL DATA')
-			console.log(histData);
-
-			console.log('GENERATE GRAPHICS')
-			generateGraphics();
+			$('#cp_list').change(function(){
+				symbol = $(this).val();
+				createReport();
+			})
+			$('#cp_list').val(symbol);
+			$('#cp_list').change();
 
 		});
 
 
 });
 
+function createReport(){
+	$('.report').empty();
+	var curMonth= (new Date()).getMonth();
+	var curDate = (new Date()).getDate();
+	var curYear = (new Date()).getFullYear();
+
+	// ANALYSIS ESTIMATES
+
+	var yql_base_uri = "http://query.yahooapis.com/v1/public/yql?";
+	var yql_query = "SELECT * FROM yahoo.finance.analystestimate WHERE symbol='"+symbol+"'";
+	var startDate 	= constructQueryDate(curYear-1, curMonth+1, curDate);
+	var endDate		= constructQueryDate(curYear, curMonth+1, curDate);
+
+	cname = symMap[symbol].name;
+	console.log("Retrieving Data for " + cname);
+	$.when(
+		runQuery(yql_base_uri,
+			"SELECT * FROM yahoo.finance.analystestimate WHERE symbol='"+symbol+"'"),
+		runQuery(yql_base_uri,
+			"SELECT * FROM yahoo.finance.keystats WHERE symbol='"+symbol+"'"),
+		runQuery(yql_base_uri,
+			"SELECT * FROM yahoo.finance.incomestatement WHERE symbol='"+symbol+"'"),
+		runQuery(yql_base_uri,
+			"select * from yahoo.finance.historicaldata(0) where symbol = '"+symbol+"' and startDate = '"+startDate+"' and endDate = '"+endDate+"'")
+	).done(function(resAnalystEst, resKeyStats, resIncomeStat, resHistPrice){
+		// Finance Data		
+		analystEst = resAnalystEst[0].query.results.results;
+		console.log('ANALYSIS ESTIMATES')
+		console.log(analystEst);
+
+		keyStats = resKeyStats[0].query.results.stats;
+		console.log('KEY STATISTICS')
+		console.log(keyStats);	
+
+		incomeStat = resIncomeStat[0].query.results.incomestatement.statement;
+		console.log('INCOME STATEMENT')
+		console.log(incomeStat);	
+
+
+		histData = resHistPrice[0].query.results.quote;
+		for (var i in histData){
+			histData[i].Adj_Close 	= parseFloat(histData[i].Adj_Close);
+			histData[i].Close 		= parseFloat(histData[i].Close);
+			histData[i].High 		= parseFloat(histData[i].High);
+			histData[i].Open 		= parseFloat(histData[i].Open);
+			histData[i].Low 		= parseFloat(histData[i].Low);
+			histData[i].Volume 		= parseFloat(histData[i].Volume); 
+		}
+		console.log('HISTORICAL DATA')
+		console.log(histData);
+
+		console.log('GENERATE GRAPHICS')
+		generateGraphics();				
+	});	
+}
 function generateGraphics(){
 	// GENERATE GRAPHICS
 	var w = 800;
@@ -150,10 +168,10 @@ function generateGraphics(){
 	y += 50;
 
 	var highlightText;
-	if (curEpsQtrGrowth){
+	if (curEpsQtrGrowth>0){
 		highlightText = "Analysts project a profit of $" + epsQtrEst + " a share, a rise from $" + epsQtrYrAgo + " per share a year ago";
 	}else{
-		highlightText = "Analysts project profit to drop from $"+epsYrYrAgo+" year-over-year to $"+ epsQtrEst+" per share.";
+		highlightText = "Analysts project profit to drop from $"+epsQtrYrAgo+" year-over-year to $"+ epsQtrEst+" per share.";
 	}
 	var highlight = svg.append("text")
 		.attr("x", x)
@@ -316,6 +334,7 @@ function generateGraphics(){
 		.append("xhtml:p")
 		.html(analResult.result);
 
+	console.log(analResult);
 	for (var key in analResult.highlight){
 		var bars = analResult.highlight[key];
 		console.log(key);
@@ -415,7 +434,11 @@ function analyzeRevenueHistory(data){
 			calcPercentChange(data[0].value, data[inc].value) + "% to " +
 			toCurrency(data[0].value) + " from the " + toQuarter(data[inc].label) + " quarter("
 			+ data[inc].label.slice(-4) +").";
-
+		highlight['#revenue_trend'] = [];
+		for (var i=0; i<inc+1; i++){
+			console.log(data[i].label.replace(/[^a-zA-Z0-9]/g, ''));
+			highlight['#revenue_trend'].push("#" + data[i].label.replace(/[^a-zA-Z0-9]/g, ''));
+		}
 	}
 
 	
@@ -571,6 +594,7 @@ var runQuery = function(ws_base_uri,query) {
 </div>
 
 	<div class="container">
+		<select id="cp_list"></select>
 		<div class="report"></report>
 	</div>
 </body>

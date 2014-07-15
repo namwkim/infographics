@@ -5,6 +5,9 @@ body {
 	font-family:"Times New Roman",Georgia,Serif;
 	color:#2e3436;
 }
+.text-highlight{
+	color: steelblue !important; 
+}
 
 .container {
 	position:absolute;

@@ -19,8 +19,9 @@ var incomeStat;
 var symbol;
 var cname;
 var symMap;
+var profileMap;
 $(document).ready(function(){
-	symbol 	= 'GOOGL';
+	symbol 	= 'AAPL';
 
 	var curMonth= (new Date()).getMonth();
 	var curDate = (new Date()).getDate();
@@ -34,6 +35,7 @@ $(document).ready(function(){
 	var endDate		= constructQueryDate(curYear, curMonth+1, curDate);
 
 	$.when(
+		$.get("./files/company_profile.csv"),
 		$.get("./files/secwiki_tickers.csv"), 
 		runQuery(yql_base_uri,
 			"SELECT * FROM yahoo.finance.analystestimate WHERE symbol='"+symbol+"'"),
@@ -44,7 +46,18 @@ $(document).ready(function(){
 		runQuery(yql_base_uri,
 			"select * from yahoo.finance.historicaldata(0) where symbol = '"+symbol+"' and startDate = '"+startDate+"' and endDate = '"+endDate+"'")
 
-		).done(function(tickerData, resAnalystEst, resKeyStats, resIncomeStat, resHistPrice){
+		).done(function(profileData, tickerData, resAnalystEst, resKeyStats, resIncomeStat, resHistPrice){
+			//console.log(profileData[0])
+			var lines = profileData[0].split('\n');
+			profileMap = {};
+			for (var i in lines){
+				var cols 	= lines[i].split(',');
+				var symb 	= cols[0];
+				cols.splice(0, 1);
+				var desc 	= cols.join(',').slice(1,-2);
+				profileMap[symb] = desc;
+			}
+			console.log(profileMap);
 			// Symbol -> Name, Sector, Industry Mapping
 			symMap = {};
 			var lines = tickerData[0].split('\n');
@@ -61,8 +74,7 @@ $(document).ready(function(){
 				};
 			}
 			console.log(symMap);	
-
-			cname = symMap[symbol].name;
+			cname = symMap["AAPL"].name;
 			
 			// Finance Data		
 			analystEst = resAnalystEst[0].query.results.results;
@@ -101,7 +113,7 @@ $(document).ready(function(){
 function generateGraphics(){
 	// GENERATE GRAPHICS
 	var w = 800;
-	var h = 1200;
+	var h = 920;
 	var x = 10;
 	var y = 60;
 	var report = d3.select(".report").style("background-color", "#ffffff");
@@ -295,13 +307,37 @@ function generateGraphics(){
 		.attr("width", 350)
 		.attr("height", 250);
 
+	var analResult = analyzeRevenueHistory(data);
 	secondCol.append("foreignObject")
 		.attr("x", 0)
 		.attr("y", 10)
 		.attr("width", 350)
 		.attr("height", 250)
 		.append("xhtml:p")
-		.html(analyzeRevenueHistory(data));
+		.html(analResult.result);
+
+	for (var key in analResult.highlight){
+		var bars = analResult.highlight[key];
+		console.log(key);
+		console.log(bars);
+		$(key).hover(
+			function(){
+				bars.forEach(function(d, i){
+					var currFill = d3.selectAll(".bar").filter(d).attr("fill");
+					d3.selectAll(".bar").filter(d).attr("fill", "steelblue");
+					d3.selectAll(".bar").filter(d).attr("prevFill", currFill);
+				});
+				$(this).addClass("text-highlight");
+
+			},function(){
+				bars.forEach(function(d, i){
+					var prevFill = d3.selectAll(".bar").filter(d).attr("prevFill");
+					d3.selectAll(".bar").filter(d).attr("fill", prevFill);
+				});
+				$(this).removeClass("text-highlight");
+			}
+		);
+	}
 	/////////////////////////////////////////////////////////// Third Layer //////////////////////////////
 	y+= 250;
 
@@ -341,17 +377,31 @@ function generateGraphics(){
 		data  		: data
 	})
 	/////////////////////////////////////////////////////////// Fourth Layer //////////////////////////////
-	y += 250;
+	y += 220;
 	var fourthLayer = svg.append("g");
+	var firstCol = fourthLayer.append("svg")
+		.attr("x", x)
+		.attr("y", y)
+		.attr("width", 800)
+		.attr("height", 250);
+
+	firstCol.append("foreignObject")
+		.attr("x", 0)
+		.attr("y", 10)
+		.attr("width", 700)
+		.attr("height", 250)
+		.append("xhtml:p")
+		.html(profileMap[symbol]);
 	
 }
 function analyzeRevenueHistory(data){
 	var result = "";
+	var highlight = {};
 	//1. Find Increasing or Decreasing Trend
 	var pairs = d3.pairs(data);
 	var inc = 0, dec = 0;
 	for (var i in pairs){
-		console.log(pairs[i][0].value +", " +pairs[i][1].value);
+		//console.log(pairs[i][0].value +", " +pairs[i][1].value);
 		if (inc == i && pairs[i][0].value > pairs[i][1].value){
 			inc+=1;
 		}
@@ -360,21 +410,29 @@ function analyzeRevenueHistory(data){
 		}
 	}
 	if (inc>0){
-		result+="Revenue rose in the last " + (inc+1) +" quarters. " 
+		result+="Revenue rose in <span class='desc' id='revenue_trend' style='font-weight:bold'>the last " + (inc+1) +" quarters.</span>  " 
 		result+="In the last quarter, revenue increased " + 
 			calcPercentChange(data[0].value, data[inc].value) + "% to " +
 			toCurrency(data[0].value) + " from the " + toQuarter(data[inc].label) + " quarter("
 			+ data[inc].label.slice(-4) +").";
 
 	}
+
+	
 	if (dec>0){
-		result+="Revenue dropped in the last " + (dec+1) + " quarters. "
+		result+="Revenue dropped in <span class='desc' id='revenue_trend' style='font-weight:bold'> the last " + (dec+1) + " quarters.</span> "
 		result+="In the last quarter, revenue decreased " + 
 			calcPercentChange(data[0].value, data[dec].value) + "% to " +
 			toCurrency(data[0].value) + " from the " + toQuarter(data[dec].label) + " quarter("
 			+ data[dec].label.slice(-4) +").";
-
+		highlight['#revenue_trend'] = [];
+		for (var i=0; i<dec+1; i++){
+			console.log(data[i].label.replace(/[^a-zA-Z0-9]/g, ''));
+			highlight['#revenue_trend'].push("#" + data[i].label.replace(/[^a-zA-Z0-9]/g, ''));
+		}
 	}
+
+
 
 	//2. % Increase or Decrease from Min or Max.
 	var cloned = data.slice(0);
@@ -387,7 +445,7 @@ function analyzeRevenueHistory(data){
 			+ min.label.slice(-4) +").";
 	result += "The difference between the two extremes is " + toCurrency(max.value - min.value) 
 			+ " (" + calcPercentChange(max.value, min.value)+  "%)";
-	return result;
+	return { result : result, highlight: highlight} ;
 
 }
 function analyzePriceHistory(data){
@@ -410,7 +468,7 @@ function analyzePriceHistory(data){
 			+ ". It is " + calcPercentChange(max.Close, min.Close) + "% increase from the lowest price, " + toCurrency(min.Close)  + " (" + minDate.toDateString()+")."
 	}else{
 		result += "For the past year, the lowest price was " + toCurrency(min.Close) + " which occured on " + minDate.toDateString() 
-			+ ". It is " + calcPercentChange(max.Close, min.Close) + "% decrease from the highest price, " + toCurrency(max.Close)  + " on " + maxDate.toDateString()+""
+			+ ". It is " + calcPercentChange(max.Close, min.Close) + "% decrease from the highest price, " + toCurrency(max.Close)  + " on " + maxDate.toDateString()+". "
 	}
 	//4. Moving Average
 	var mv50 = 0;
@@ -425,9 +483,9 @@ function analyzePriceHistory(data){
 	mv200/=200;
 
 	if (mv50>curPrice && mv200>curPrice){
-		result += "50Day-, 200Day-MA prices are " + mv50 + ", "+mv200 +" respectively, higher than the current price and possibly indicating the increasing direction of future price.";
+		result += "50Day-, 200Day-MA prices are " + toCurrency(mv50) + " and "+toCurrency(mv200) +" respectively, higher than the current price and possibly indicating the increasing direction of future price.";
 	}else if (mv50<curPrice && mv200<curPrice){
-		result += "50Day-, 200Day-MA prices are " + mv50 + ", "+mv200 +" respectively, lower than the current price and possibly indicating the decreasing direction of future price.";
+		result += "50Day-, 200Day-MA prices are " + toCurrency(mv50) + " and "+toCurrency(mv200) +" respectively, lower than the current price and possibly indicating the decreasing direction of future price.";
 
 	}
 

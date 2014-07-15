@@ -58,11 +58,13 @@ var barchart = {
     svg.selectAll(".bar")
     .data(data)
     .enter().append("rect")
-    .attr("class", "bar")
+    .attr("class", "bar" )
+    .attr("id", function(d){ return d.label.replace(/[^a-zA-Z0-9]/g, ''); })
     .attr("x", function(d) { return x(d.label); })
     .attr("width", x.rangeBand())
     .attr("y", function(d) { return y(d.value); })
-    .attr("height", function(d) { return height - y(d.value); });
+    .attr("height", function(d) { return height - y(d.value); })
+    .attr("fill", "DarkSlateGray");
 
     var fmt = this.toCurrency;
 
